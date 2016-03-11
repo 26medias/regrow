@@ -1,0 +1,21 @@
+{
+  "name": "regrow",
+  "description": "Genetic algorithms used to organically regrow pixels to extrapolate details not present in the original image, allowing in theory to zoom in on a photo.",
+  "version": "0.0.1",
+  "dependencies": {
+    "underscore": "latest",
+    "domain": "latest",
+    "pstack": "latest",
+    "image-data": "latest",
+    "pixfilters": "latest"
+  },
+  "main": "regrow.js",
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://raw.github.com/26medias/regrow/master/LICENSE"
+    }
+  ],
+  "readme": "ERROR: No README data found!",
+  "scripts": {}
+}
