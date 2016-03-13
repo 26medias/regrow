@@ -11,11 +11,11 @@ image.open(path.normalize(__dirname+"/test/origin.png"), function(err) {
 	image.scale({
 		display:	'crop',	// crop, fit
 		scaleUp:	false,
-		width:		20,
-		height:		20
+		width:		10,
+		height:		10
 	});
 	
-	image.export(path.normalize(__dirname+"/test/20.png"), function(filename) {
+	image.export(path.normalize(__dirname+"/test/10.png"), function(filename) {
 		console.log("Exported: ", filename);
 	});
 });

@@ -7,7 +7,8 @@
     "domain": "latest",
     "pstack": "latest",
     "image-data": "latest",
-    "pixfilters": "latest"
+    "pixfilters": "latest",
+    "fs-tool": "latest"
   },
   "main": "regrow.js",
   "licenses": [

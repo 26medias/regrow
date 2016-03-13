@@ -50,6 +50,7 @@ cell.prototype.each = function(update) {
 	var scope = this;
 	_.each(this.data.pixels, function(v, p) {
 		scope.data.pixels[p]	= scope.rgba_encode(update(scope.rgba_decode(scope.data.pixels[p])));
+		return true;
 	});
 	return this;
 }
@@ -98,14 +99,17 @@ var organism	= function(options) {
 		pixels:			[],
 		width:			0,
 		height:			0,
-		population:		200,
-		maxPopulation:	500,
+		population:		50,
+		maxPopulation:	100,
 		lifecycle:		20,
-		mutation:		.1,
-		mutationMerge:	.02,
+		mutation:		.15,
+		mutationMerge:	.05,
 		alpha:			.1,
-		generations:	10
+		generations:	500,
+		targetMSE:		5
 	}, options);
+	
+	//console.log("this.options",this.options);
 }
 
 organism.prototype.run = function(callback) {
@@ -125,9 +129,8 @@ organism.prototype.run = function(callback) {
 	var noisy		= this.applyNoise(stretched);
 	
 	// Export for debug
-	this.exportPixels(this.options.pixels, this.options.width, this.options.height, 'test/export/clipped.png');
-	this.exportPixels(noisy.pixels, noisy.width, noisy.height, 'test/export/noisy.png');
-	
+	//this.exportPixels(this.options.pixels, this.options.width, this.options.height, 'test/export/clipped.png');
+	//this.exportPixels(noisy.pixels, noisy.width, noisy.height, 'test/export/noisy.png');
 	
 	this.population	= [];
 	var i;
@@ -148,31 +151,62 @@ organism.prototype.run = function(callback) {
 	for (i=0;i<this.options.generations;i++) {
 		stack.add(function(done, i) {
 			scope.checkPopulationFitness();
-			//console.log("-----------");
-			//console.log("Generation ",i,scope.population.length);
+			console.log("Generation ",i,scope.population.length);
 			console.log(scope.getCurrentFitness());
 			scope.cullPopulation();
 			scope.reproductionCycle();
-			//scope.checkPopulationFitness();
-			//scope.checkPopulationFitness();
+			//console.log("-----------");
 			done();
+			return true;
 		},i);
 	}
 	stack.start(function() {
 		//console.log("Done");
 		scope.checkPopulationFitness();
-		scope.cullPopulation(10);
+		scope.cullPopulation(20);
 		console.log(scope.getCurrentFitness());
+		
+		scope.exportPopulation('best');
+		return true;
+		
+		//callback(scope.population[0].data);
+		
+		//console.log(scope.getCurrentFitness());
 		//scope.exportPopulation('evolved');
 		
 		// scale the best one
-		var scaled		= scope.resize(scope.population[0].data.pixels, scope.population[0].data.width, scope.population[0].data.height, scope.options.width, scope.options.height);
+		//var scaled		= scope.resize(scope.population[0].data.pixels, scope.population[0].data.width, scope.population[0].data.height, scope.options.width, scope.options.height);
 		
 		//scope.exportPixels(scaled.pixels, scaled.width, scaled.height, 'test/export/evolved-scaled.png');
 		
 		//scope.exportPixels(scope.population[0].data.pixels, scope.population[0].data.width, scope.population[0].data.height, 'test/export/evolved-winner.png');
 	});
 	
+}
+
+
+organism.prototype.checkPopulationFitness = function() {
+	var scope = this;
+	
+	_.each(this.population, function(population, n) {
+		// Scale down to the sample size
+		var scaled		= scope.resize(population.data.pixels, population.data.width, population.data.height, scope.options.width, scope.options.height);
+		
+		// Compute the difference
+		scope.population[n].fitness = scope.getPixelFitness(scaled);
+		
+		// Remember the age
+		//scope.population[n].lifecycle++;
+		return true;
+	});
+	
+	
+	// Rank the population
+	this.population.sort(function(a,b) {
+		return a.fitness-b.fitness;
+	});
+	
+	return this;
 }
 
 organism.prototype.getCurrentFitness = function() {
@@ -205,17 +239,6 @@ organism.prototype.cullPopulation = function(n) {
 		//console.log("Culling the population");
 		this.population = this.population.slice(0, n);
 	}
-	
-	return this;
-}
-
-organism.prototype.agePopulation = function() {
-	var scope = this;
-	
-	// Rank the population
-	this.population	= _.filter(this.population, function(item) {
-		return item.lifecycle<scope.options.lifecycle;
-	});
 	
 	return this;
 }
@@ -267,24 +290,13 @@ organism.prototype.merge = function(cell1, cell2) {
 	newCell.mutate();
 	return newCell;
 }
-organism.prototype.checkPopulationFitness = function() {
+
+organism.prototype.agePopulation = function() {
 	var scope = this;
 	
-	_.each(this.population, function(population, n) {
-		// Scale down to the sample size
-		var scaled		= scope.resize(population.data.pixels, population.data.width, population.data.height, scope.options.width, scope.options.height);
-		
-		// Compute the difference
-		scope.population[n].fitness = scope.getPixelFitness(scaled);
-		
-		// Remember the age
-		//scope.population[n].lifecycle++;
-	});
-	
-	
 	// Rank the population
-	this.population.sort(function(a,b) {
-		return a.fitness-b.fitness;
+	this.population	= _.filter(this.population, function(item) {
+		return item.lifecycle<scope.options.lifecycle;
 	});
 	
 	return this;

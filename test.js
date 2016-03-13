@@ -6,13 +6,13 @@ var regrow		= require("./regrow");
 
 
 var image	= new imageData();
-image.open(path.normalize(__dirname+"/test/20.png"), function(err) {
+image.open(path.normalize(__dirname+"/test/10.png"), function(err) {
 	
 	var growth	= new regrow(image, {
 		sample:	2,
 		factor:	2
 	});
-	growth.init();
+	growth.regen();
 	
 	/*
 	growth.export(path.normalize(__dirname+"/test/40.png"), function(filename) {
@@ -21,7 +21,7 @@ image.open(path.normalize(__dirname+"/test/20.png"), function(err) {
 	*/
 });
 
-
+/*
 var image2	= new imageData();
 image2.open(path.normalize(__dirname+"/test/40.png"), function(err) {
 	
@@ -32,3 +32,4 @@ image2.open(path.normalize(__dirname+"/test/40.png"), function(err) {
 	growth.expected();
 	
 });
+*/

@@ -1,9 +1,11 @@
 var domain		= require('domain');
 var _			= require("underscore");
 var pstack		= require("pstack");
+var fstool		= require("fs-tool");
 var imageData	= require("image-data");
 var pixfilters	= require("pixfilters");
 var organism	= require("./ga");
+var path		= require("path");
 
 
 var regrow	= function(image, options) {
@@ -14,7 +16,27 @@ var regrow	= function(image, options) {
 	}, options);
 }
 
+regrow.prototype.regen = function() {
+	this.pixfilter	= new pixfilters(this.image.pixels, this.image.options.width, this.image.options.height);
+	this.grayscale();
+	//this.export('test/export/grayscale.png', function() {});
+	
+	var ga			= new organism({
+		pixels:			this.image.pixels,
+		width:			this.image.options.width,
+		height:			this.image.options.width,
+		stretchWidth:	this.image.options.width*this.options.factor,
+		stretchHeight:	this.image.options.width*this.options.factor
+	});
+	
+	ga.run(function(response) {
+		console.log("response",response);
+		//scope.exportPixels(response.pixels, response.width, response.height, 'test/export/evolved.png');
+	})
+}
+
 regrow.prototype.init = function() {
+	var scope = this;
 	/*
 		Make the image black and white
 		Get a sample into an object
@@ -30,7 +52,101 @@ regrow.prototype.init = function() {
 	this.export('test/export/grayscale.png', function() {});
 	
 	// Clip
-	this.clip(0,0);
+	this.pixmap	= [];
+	
+	var stack = new pstack({
+		progress:	'Growing...'
+	});
+	
+	var x,y,w,h;
+	//w	= 4;
+	//h	= 1;
+	w	= this.image.options.width-this.options.sample;
+	h	= this.image.options.height-this.options.sample;
+	
+	console.log("wh",w,h);
+	
+	//return false;
+	for (x=0;x<w;x++) {
+		for (y=0;y<h;y++) {
+			stack.add(function(done, p) {
+				//scope.pixmap[scope.index(p.x,p.y,w)] = [];
+				//done();
+				scope.clip(p.x,p.y, function(pixels) {
+					scope.pixmap[scope.index(p.x,p.y,w)] = pixels;
+					done();
+				});
+			}, {x:x,y:y});
+		}
+	}
+	stack.start(function() {
+		console.log("Exporting the pixmap", scope.pixmap.length);
+		scope.exportPixmap(scope.pixmap);
+		//scope.mergePixmap(scope.pixmap, scope.image.options.width*scope.options.factor, scope.image.options.height*scope.options.factor);
+	});
+	
+	/*
+	this.clip(0,0,function(response) {
+		console.log("Evolved!",response);
+	});
+	*/
+}
+
+regrow.prototype.exportPixmap = function(pixmap) {
+	var scope = this;
+	
+	// Prepare the data
+	var stack = new pstack({
+		progress:	'Exporting...'
+	});
+	var output = [];
+	_.each(pixmap, function(item,n) {
+		stack.add(function(done) {
+			var filename = 'test/export/tile-'+n+'.png';
+			console.log(">>>> EXPORT",item, filename);
+			scope.exportPixels(item, scope.options.sample*scope.options.factor, scope.options.sample*scope.options.factor, filename, function() {
+				output[n] = filename;
+				done();
+			});
+		});
+	})
+	
+	stack.start(function(done, p) {
+		fstool.file.writeJson("test/export/pixmap.json", output, function() {
+			console.log("Done!");
+		});
+	});
+}
+
+regrow.prototype.mergePixmap = function(pixmap, w, h) {
+	
+	console.log("Merging the clips", w, h);
+	
+	var image	= new imageData({
+		width:	w,
+		height:	h
+	});
+	var i,j;
+	var l = pixmap.length;
+	var l2 = (this.options.sample*this.options.factor)*(this.options.sample*this.options.factor);
+	var x,y,xx,yy;
+	for (i=0;i<l;i++) {
+		x = this.inv_index(i, w).x*2;
+		y = this.inv_index(i, w).y*2;
+		//console.log(">>",x,y);
+		for (j=0;j<l2;j++) {
+			color	= this.rgba_decode(pixmap[i][j]);
+			//color.a	= 120;
+			xx = x+this.inv_index(j, this.options.sample*this.options.factor).x;
+			yy = y+this.inv_index(j, this.options.sample*this.options.factor).y;
+			console.log("color ",xx,yy,color);
+			image.setPixel(xx, yy, color);
+		}
+	}
+	
+	image.export(path.normalize(__dirname+"/test/export/zoomed.png"), function(filename) {
+		console.log("Exported: ", filename);
+	});
 }
 
 regrow.prototype.expected = function(x,y) {
@@ -43,11 +159,13 @@ regrow.prototype.expected = function(x,y) {
 	this.exportPixels(clipped, this.options.sample, this.options.sample, 'test/export/_expected-clipped.png');
 }
 
-regrow.prototype.clip = function(x,y) {
+regrow.prototype.clip = function(x,y, callback) {
 	var scope		= this;
 	
 	// Clip from the source
-	var clipped		= this.pixfilter.clip(x,y,x+this.options.sample,y+this.options.sample,'pixels');
+	var clipped		= this.pixfilter.clip(x,y,this.options.sample,this.options.sample,'pixels');
+	//callback(clipped);
+	
 	
 	var ga			= new organism({
 		pixels:			clipped,
@@ -57,6 +175,8 @@ regrow.prototype.clip = function(x,y) {
 		stretchHeight:	this.options.sample*this.options.factor
 	});
 	ga.run(function(response) {
+		console.log("Done: ",x,y);
+		callback(response);
 		//scope.exportPixels(response.pixels, response.width, response.height, 'test/export/evolved.png');
 	})
 	
@@ -191,7 +311,28 @@ regrow.prototype.resize = function(pixels, in_w, in_h, outputWidth, outputHeight
 	};
 	
 }
+regrow.prototype.index = function(x, y, w) {
+	if (!w) {
+		w = this.options.width;
+	}
+	return y * w + x;
+}
 
+regrow.prototype.inv_index = function(i, w) {
+	/*
+		y	= (i/w)^0
+		x	= i-(y*w)
+	*/
+	if (!w) {
+		w = this.options.width;
+	}
+	var y	= (i/w)^0;
+	var x	= i-(y*w);
+	return {
+		x:	x,
+		y:	y
+	}
+}
 // Encode an rgba color into an int
 regrow.prototype.rgba_encode = function(color) {
 	// We encode into a int a 255 buffer, probability, position and direction
